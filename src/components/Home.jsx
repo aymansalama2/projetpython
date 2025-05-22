@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getAllRoutes, getAllCities } from '../services/api';
+import { searchService, locationService } from '../services/api';
 
 export function Home() {
   const [activeTab, setActiveTab] = useState('schedules');
@@ -12,25 +12,34 @@ export function Home() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   
-  const { currentUser, isAdmin, isAuthenticated, signOut } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   
   useEffect(() => {
     const fetchData = async () => {
       try {
+        if (!user) {
+          navigate('/login');
+          return;
+        }
         const [routesData, citiesData] = await Promise.all([
-          getAllRoutes(),
-          getAllCities()
+          searchService.getAllRoutes(),
+          locationService.getAllCities()
         ]);
         setRoutes(routesData);
         setCities(citiesData);
       } catch (error) {
         console.error('Erreur lors du chargement des données:', error);
+        if (error.response?.status === 401) {
+          navigate('/login');
+        }
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    if (!authLoading) {
+      fetchData();
+    }
     
     const handleScroll = () => {
       setScrolled(window.scrollY > 50);
@@ -38,10 +47,11 @@ export function Home() {
     
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [user, authLoading, navigate]);
 
   const handleLogout = () => {
-    signOut();
+    localStorage.removeItem('token');
+    navigate('/login');
   };
   
   const goToAdminDashboard = () => {
@@ -104,9 +114,9 @@ export function Home() {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="flex items-center space-x-4"
             >
-              {isAuthenticated ? (
+              {user ? (
                 <>
-                  {isAdmin && (
+                  {user.isAdmin && (
                     <button
                       onClick={goToAdminDashboard}
                       className="px-6 py-2 rounded-full bg-white text-blue-600 hover:bg-blue-50 transition-all duration-300 shadow-sm hover:shadow-md"

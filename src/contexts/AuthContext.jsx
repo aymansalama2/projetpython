@@ -1,55 +1,7 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import { login as apiLogin, register as apiRegister, getCurrentUser } from '../services/api';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { authService } from '../services/api';
 
 const AuthContext = createContext(null);
-
-export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            getCurrentUser()
-                .then(response => {
-                    setUser(response.data);
-                })
-                .catch(() => {
-                    localStorage.removeItem('token');
-                })
-                .finally(() => {
-                    setLoading(false);
-                });
-        } else {
-            setLoading(false);
-        }
-    }, []);
-
-    const login = async (credentials) => {
-        const response = await apiLogin(credentials);
-        localStorage.setItem('token', response.data.token);
-        setUser(response.data.user);
-        return response.data;
-    };
-
-    const register = async (userData) => {
-        const response = await apiRegister(userData);
-        localStorage.setItem('token', response.data.token);
-        setUser(response.data.user);
-        return response.data;
-    };
-
-    const logout = () => {
-        localStorage.removeItem('token');
-        setUser(null);
-    };
-
-    return (
-        <AuthContext.Provider value={{ user, login, register, logout, loading }}>
-            {children}
-        </AuthContext.Provider>
-    );
-};
 
 export const useAuth = () => {
     const context = useContext(AuthContext);
@@ -58,5 +10,76 @@ export const useAuth = () => {
     }
     return context;
 };
+
+export function AuthProvider({ children }) {
+    const [user, setUser] = useState(null);
+    const [authLoading, setAuthLoading] = useState(true);
+
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            checkAuth();
+        } else {
+            setAuthLoading(false);
+        }
+    }, []);
+
+    const checkAuth = async () => {
+        try {
+            const userData = await authService.getCurrentUser();
+            userData.isAdmin = userData.is_staff || userData.is_superuser;
+            setUser(userData);
+        } catch (error) {
+            console.error('Erreur lors de la vérification de l\'authentification:', error);
+            localStorage.removeItem('token');
+        } finally {
+            setAuthLoading(false);
+        }
+    };
+
+    const login = async (token) => {
+        try {
+            const userData = await authService.getCurrentUser();
+            userData.isAdmin = userData.is_staff || userData.is_superuser;
+            setUser(userData);
+            return userData;
+        } catch (error) {
+            console.error('Erreur lors de la connexion:', error);
+            throw error;
+        }
+    };
+
+    const register = async (userData) => {
+        try {
+            const response = await authService.register(userData);
+            localStorage.setItem('token', response.token.access);
+            const currentUser = await authService.getCurrentUser();
+            setUser(currentUser);
+            return currentUser;
+        } catch (error) {
+            console.error('Erreur lors de l\'inscription:', error);
+            throw error;
+        }
+    };
+
+    const logout = () => {
+        localStorage.removeItem('token');
+        setUser(null);
+    };
+
+    const value = {
+        user,
+        authLoading,
+        login,
+        logout,
+        register
+    };
+
+    return (
+        <AuthContext.Provider value={value}>
+            {children}
+        </AuthContext.Provider>
+    );
+}
 
 export default AuthContext; 

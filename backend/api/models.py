@@ -22,6 +22,19 @@ class Location(models.Model):
     def __str__(self):
         return self.city
 
+class Route(models.Model):
+    name = models.CharField(max_length=100)
+    departure_location = models.ForeignKey(Location, on_delete=models.CASCADE, related_name='route_departures')
+    arrival_location = models.ForeignKey(Location, on_delete=models.CASCADE, related_name='route_arrivals')
+    distance = models.DecimalField(max_digits=10, decimal_places=2, help_text="Distance en km")
+    duration = models.IntegerField(help_text="Durée en minutes")
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.departure_location} → {self.arrival_location})"
+
 class Schedule(models.Model):
     bus = models.ForeignKey(Bus, on_delete=models.CASCADE, related_name='schedules')
     departure_location = models.ForeignKey(Location, on_delete=models.CASCADE, related_name='departures')
@@ -36,10 +49,8 @@ class Schedule(models.Model):
     def __str__(self):
         return f"{self.departure_location} → {self.arrival_location} - {self.departure_time}"
 
-class User(models.Model):
-    username = models.CharField(max_length=100, unique=True)
-    email = models.EmailField(unique=True)
-    password = models.CharField(max_length=100)
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     full_name = models.CharField(max_length=200)
     phone = models.CharField(max_length=20)
     is_admin = models.BooleanField(default=False)
@@ -47,7 +58,7 @@ class User(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.username
+        return self.user.username
 
 class Reservation(models.Model):
     STATUS_CHOICES = [

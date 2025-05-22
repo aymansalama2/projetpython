@@ -1,19 +1,28 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Navigate, Link, useNavigate } from 'react-router-dom';
-import { useTheme } from './ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { 
+    getBuses, 
+    getLocations, 
+    getSchedules, 
+    getReservations,
+    getUserProfile
+} from '../../services/api';
 
 // Composant Header du Dashboard
 const DashboardHeader = ({ toggleSidebar, isSidebarOpen }) => {
   const { darkMode, toggleTheme } = useTheme();
   const [notifications, setNotifications] = useState(3);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   
   return (
-    <header className={`${darkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-800'} shadow-md py-4 px-6 flex items-center justify-between theme-transition`}>
+    <header className={`${darkMode ? 'bg-dark-100 text-white' : 'bg-white text-gray-800'} shadow-md py-3 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20 transition-colors duration-300`}>
       <div className="flex items-center">
         <button 
           onClick={toggleSidebar}
-          className={`mr-4 ${darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black'} lg:hidden`}
+          className={`mr-4 p-2 rounded-md ${darkMode ? 'text-gray-300 hover:text-white hover:bg-gray-800' : 'text-gray-700 hover:text-black hover:bg-gray-100'} lg:hidden transition-colors`}
           aria-label="Toggle sidebar"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -23,10 +32,18 @@ const DashboardHeader = ({ toggleSidebar, isSidebarOpen }) => {
         <h1 className="text-xl font-bold flex items-center">
           <span className={`${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>Bus</span>
           <span className="text-yellow-500">Booking</span>
-          <span className={`ml-2 ${darkMode ? 'text-gray-300' : 'text-gray-800'}`}>Admin</span>
+          <span className={`hidden md:inline-block ml-2 ${darkMode ? 'text-gray-300' : 'text-gray-800'}`}>Admin</span>
         </h1>
       </div>
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-3">
+        {/* Search button */}
+        <button className={`p-2 rounded-md ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'} transition-colors hidden md:flex`}>
+          <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </button>
+        
+        {/* Theme toggle button */}
         <button 
           onClick={toggleTheme}
           className={`p-2 rounded-full ${darkMode ? 'bg-gray-800 text-yellow-400 hover:bg-gray-700' : 'bg-gray-100 text-blue-600 hover:bg-gray-200'} transition-all duration-300`}
@@ -43,18 +60,48 @@ const DashboardHeader = ({ toggleSidebar, isSidebarOpen }) => {
           )}
         </button>
 
-        <button className={`relative p-2 ${darkMode ? 'text-gray-300 hover:text-white hover:bg-gray-800' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'} rounded-full transition-colors`}>
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        {/* Notifications button */}
+        <button className={`relative p-2 rounded-full ${darkMode ? 'text-gray-300 hover:text-white hover:bg-gray-800' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'} transition-colors`}>
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
           </svg>
-          <span className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">{notifications}</span>
+          {notifications > 0 && (
+            <span className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center animate-pulse-subtle">{notifications}</span>
+          )}
         </button>
         
-        <div className="flex items-center">
-          <div className="h-8 w-8 rounded-full overflow-hidden mr-2 ring-2 ring-blue-500">
-            <img src="https://i.pravatar.cc/36?img=68" alt="Admin" className="h-full w-full object-cover" />
-          </div>
-          <span className={`font-medium hidden sm:inline ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>Admin</span>
+        {/* Profile dropdown */}
+        <div className="relative">
+          <button 
+            onClick={() => setShowProfileMenu(!showProfileMenu)}
+            className={`flex items-center p-1 ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'} rounded-lg transition-colors`}
+          >
+            <div className="h-8 w-8 rounded-full overflow-hidden mr-2 ring-2 ring-blue-500">
+              <img src="https://i.pravatar.cc/36?img=68" alt="Admin" className="h-full w-full object-cover" />
+            </div>
+            <span className={`font-medium hidden sm:inline ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>Admin</span>
+            <svg className={`ml-1 h-5 w-5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
+          
+          {/* Profile dropdown menu */}
+          {showProfileMenu && (
+            <div 
+              className={`absolute right-0 mt-2 w-48 py-2 ${darkMode ? 'bg-dark-100 text-white border-gray-700' : 'bg-white text-gray-800 border-gray-200'} rounded-md shadow-lg border animate-fade-in transition-colors z-50`}
+            >
+              <a href="#profile" className={`block px-4 py-2 text-sm ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}>
+                Votre profil
+              </a>
+              <a href="#settings" className={`block px-4 py-2 text-sm ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}>
+                Paramètres
+              </a>
+              <div className={`border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} my-1`}></div>
+              <a href="#logout" className={`block px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30`}>
+                Déconnexion
+              </a>
+            </div>
+          )}
         </div>
       </div>
     </header>
@@ -67,176 +114,161 @@ const Sidebar = ({ isOpen }) => {
   const [activeMenu, setActiveMenu] = useState('dashboard');
   const { darkMode } = useTheme();
   
+  // Déterminez le menu actif en fonction de l'URL actuelle
+  useEffect(() => {
+    const pathname = window.location.pathname;
+    if (pathname.includes('/admin/dashboard')) setActiveMenu('dashboard');
+    else if (pathname.includes('/admin/buses')) setActiveMenu('buses');
+    else if (pathname.includes('/admin/routes')) setActiveMenu('routes');
+    else if (pathname.includes('/admin/schedules')) setActiveMenu('schedules');
+    else if (pathname.includes('/admin/bookings')) setActiveMenu('bookings');
+    else if (pathname.includes('/admin/users')) setActiveMenu('users');
+    else if (pathname.includes('/admin/settings')) setActiveMenu('settings');
+  }, []);
+  
   const handleLogout = () => {
-    localStorage.removeItem('userId');
-    localStorage.removeItem('userRole');
-    navigate('/admin/login');
+    localStorage.removeItem('token');
+    navigate('/login');
   };
   
+  const MenuItem = ({ to, icon, label, menuKey }) => {
+    const isActive = activeMenu === menuKey;
+    return (
+      <Link 
+        to={to} 
+        className={`flex items-center py-3 px-4 rounded-lg mb-1 transition-all duration-200 ${
+          isActive 
+            ? 'bg-primary-500 text-white font-medium shadow-md' 
+            : `text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800/50`
+        }`}
+        onClick={() => setActiveMenu(menuKey)}
+      >
+        {icon}
+        <span className={`ml-3 ${isActive ? 'text-white' : ''}`}>{label}</span>
+        {isActive && (
+          <span className="ml-auto">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+            </svg>
+          </span>
+        )}
+      </Link>
+    );
+  };
+  
+  const MenuSection = ({ title, children }) => (
+    <>
+      <div className="px-4 mt-6 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">{title}</div>
+      {children}
+    </>
+  );
+  
   return (
-    <aside className={`${darkMode ? 'bg-gray-900 text-white' : 'bg-slate-800 text-white'} w-64 fixed top-0 bottom-0 left-0 overflow-y-auto transition-transform duration-300 z-30 ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 theme-transition`}>
+    <aside className={`${darkMode ? 'bg-dark-200 text-white' : 'bg-slate-800 text-white'} w-64 fixed top-0 bottom-0 left-0 overflow-y-auto transition-all duration-300 z-30 ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 shadow-xl`}>
       <div className={`p-4 border-b ${darkMode ? 'border-gray-700' : 'border-slate-700'}`}>
         <Link to="/admin/dashboard" className="flex items-center justify-center py-3">
           <span className="text-2xl font-bold flex items-center">
             <span className="text-blue-400">Bus</span>
             <span className="text-yellow-500">Booking</span>
+            <span className="ml-1 text-sm bg-blue-500 text-white px-2 py-0.5 rounded-md opacity-90">Admin</span>
           </span>
         </Link>
       </div>
       
       <nav className="mt-6 px-2">
-        <div className="px-4 mb-2 text-xs font-semibold text-gray-400 uppercase">Général</div>
-        <Link 
-          to="/admin/dashboard" 
-          className={`flex items-center py-3 px-4 rounded-lg mb-1 ${
-            activeMenu === 'dashboard' 
-              ? darkMode 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-blue-600 text-white' 
-              : darkMode 
-                ? 'text-gray-300 hover:bg-gray-800' 
-                : 'text-gray-300 hover:bg-slate-700'
-          } transition-colors`}
-          onClick={() => setActiveMenu('dashboard')}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-          </svg>
-          <span>Tableau de bord</span>
-        </Link>
+        <MenuSection title="Général">
+          <MenuItem 
+            to="/admin/dashboard" 
+            menuKey="dashboard"
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+            }
+            label="Tableau de bord"
+          />
+        </MenuSection>
         
-        <div className="px-4 mt-6 mb-2 text-xs font-semibold text-gray-400 uppercase">Gestion</div>
+        <MenuSection title="Gestion">
+          <MenuItem 
+            to="/admin/buses" 
+            menuKey="buses"
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            }
+            label="Bus"
+          />
+          
+          <MenuItem 
+            to="/admin/routes" 
+            menuKey="routes"
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+              </svg>
+            }
+            label="Itinéraires"
+          />
+          
+          <MenuItem 
+            to="/admin/schedules" 
+            menuKey="schedules"
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            }
+            label="Horaires"
+          />
+          
+          <MenuItem 
+            to="/admin/bookings" 
+            menuKey="bookings"
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+              </svg>
+            }
+            label="Réservations"
+          />
+          
+          <MenuItem 
+            to="/admin/users" 
+            menuKey="users"
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            }
+            label="Utilisateurs"
+          />
+        </MenuSection>
         
-        <Link 
-          to="/admin/buses" 
-          className={`flex items-center py-3 px-4 rounded-lg mb-1 ${
-            activeMenu === 'buses' 
-              ? darkMode 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-blue-600 text-white' 
-              : darkMode 
-                ? 'text-gray-300 hover:bg-gray-800' 
-                : 'text-gray-300 hover:bg-slate-700'
-          } transition-colors`}
-          onClick={() => setActiveMenu('buses')}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
-          <span>Bus</span>
-        </Link>
+        <MenuSection title="Configuration">
+          <MenuItem 
+            to="/admin/settings" 
+            menuKey="settings"
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            }
+            label="Paramètres"
+          />
+        </MenuSection>
         
-        <Link 
-          to="/admin/routes" 
-          className={`flex items-center py-3 px-4 rounded-lg mb-1 ${
-            activeMenu === 'routes' 
-              ? darkMode 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-blue-600 text-white' 
-              : darkMode 
-                ? 'text-gray-300 hover:bg-gray-800' 
-                : 'text-gray-300 hover:bg-slate-700'
-          } transition-colors`}
-          onClick={() => setActiveMenu('routes')}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-          </svg>
-          <span>Itinéraires</span>
-        </Link>
-        
-        <Link 
-          to="/admin/schedules" 
-          className={`flex items-center py-3 px-4 rounded-lg mb-1 ${
-            activeMenu === 'schedules' 
-              ? darkMode 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-blue-600 text-white' 
-              : darkMode 
-                ? 'text-gray-300 hover:bg-gray-800' 
-                : 'text-gray-300 hover:bg-slate-700'
-          } transition-colors`}
-          onClick={() => setActiveMenu('schedules')}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span>Horaires</span>
-        </Link>
-        
-        <Link 
-          to="/admin/bookings" 
-          className={`flex items-center py-3 px-4 rounded-lg mb-1 ${
-            activeMenu === 'bookings' 
-              ? darkMode 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-blue-600 text-white' 
-              : darkMode 
-                ? 'text-gray-300 hover:bg-gray-800' 
-                : 'text-gray-300 hover:bg-slate-700'
-          } transition-colors`}
-          onClick={() => setActiveMenu('bookings')}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-          </svg>
-          <span>Réservations</span>
-        </Link>
-        
-        <Link 
-          to="/admin/users" 
-          className={`flex items-center py-3 px-4 rounded-lg mb-1 ${
-            activeMenu === 'users' 
-              ? darkMode 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-blue-600 text-white' 
-              : darkMode 
-                ? 'text-gray-300 hover:bg-gray-800' 
-                : 'text-gray-300 hover:bg-slate-700'
-          } transition-colors`}
-          onClick={() => setActiveMenu('users')}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-          </svg>
-          <span>Utilisateurs</span>
-        </Link>
-        
-        <div className="px-4 mt-6 mb-2 text-xs font-semibold text-gray-400 uppercase">Configuration</div>
-        
-        <Link 
-          to="/admin/settings" 
-          className={`flex items-center py-3 px-4 rounded-lg mb-1 ${
-            activeMenu === 'settings' 
-              ? darkMode 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-blue-600 text-white' 
-              : darkMode 
-                ? 'text-gray-300 hover:bg-gray-800' 
-                : 'text-gray-300 hover:bg-slate-700'
-          } transition-colors`}
-          onClick={() => setActiveMenu('settings')}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          <span>Paramètres</span>
-        </Link>
-        
-        <div className="px-2 mt-6">
+        <div className="px-2 mt-6 pb-4">
           <button 
             onClick={handleLogout}
-            className={`flex items-center w-full py-3 px-4 rounded-lg ${
-              darkMode 
-                ? 'text-gray-300 hover:bg-red-900/30 hover:text-red-300' 
-                : 'text-gray-300 hover:bg-red-900/30 hover:text-red-300'
-            } transition-colors`}
+            className="flex items-center w-full py-3 px-4 rounded-lg text-white bg-red-500/30 hover:bg-red-500/70 transition-all duration-200"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
-            <span>Déconnexion</span>
+            <span className="ml-3">Déconnexion</span>
           </button>
         </div>
       </nav>
@@ -245,112 +277,35 @@ const Sidebar = ({ isOpen }) => {
 };
 
 // Composant de contenu du tableau de bord
-const DashboardContent = () => {
+const DashboardContent = ({ stats, loading, error }) => {
   const { darkMode } = useTheme();
   
-  // Données simulées pour les statistiques
-  const stats = [
-    { 
-      title: "Réservations", 
-      value: "1,248", 
-      change: "+12.5%", 
-      trend: "up",
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-        </svg>
-      )
-    },
-    { 
-      title: "Voyages actifs", 
-      value: "36", 
-      change: "+4.3%", 
-      trend: "up",
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      )
-    },
-    { 
-      title: "Utilisateurs", 
-      value: "854", 
-      change: "+18.2%", 
-      trend: "up",
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-      )
-    },
-    { 
-      title: "Itinéraires", 
-      value: "18", 
-      change: "+0%", 
-      trend: "neutral",
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-        </svg>
-      )
-    }
-  ];
+  if (loading) {
+    return (
+      <div className={`flex-grow flex items-center justify-center ${darkMode ? 'bg-dark-200' : 'bg-gray-50'}`}>
+        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
-  // Données simulées pour les réservations récentes
-  const recentBookings = [
-    { id: "RB-1234", customer: "Jean Dupont", route: "Paris - Lyon", date: "2023-08-15", status: "Confirmé" },
-    { id: "RB-1235", customer: "Marie Laurent", route: "Marseille - Nice", date: "2023-08-16", status: "En attente" },
-    { id: "RB-1236", customer: "Thomas Bernard", route: "Toulouse - Bordeaux", date: "2023-08-16", status: "Confirmé" },
-    { id: "RB-1237", customer: "Sophie Martin", route: "Lyon - Grenoble", date: "2023-08-17", status: "Annulé" },
-    { id: "RB-1238", customer: "Pierre Dubois", route: "Paris - Strasbourg", date: "2023-08-17", status: "Confirmé" }
-  ];
-
-  // Quick action buttons
-  const quickActions = [
-    {
-      title: "Ajouter un bus",
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-        </svg>
-      ),
-      link: "/admin/buses",
-      color: "blue"
-    },
-    {
-      title: "Créer un itinéraire",
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-        </svg>
-      ),
-      link: "/admin/routes",
-      color: "indigo"
-    },
-    {
-      title: "Ajouter un horaire",
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-        </svg>
-      ),
-      link: "/admin/schedules",
-      color: "purple"
-    },
-    {
-      title: "Gérer les réservations",
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-        </svg>
-      ),
-      link: "/admin/bookings",
-      color: "teal"
-    }
-  ];
+  if (error) {
+    return (
+      <div className={`flex-grow flex items-center justify-center ${darkMode ? 'bg-dark-200' : 'bg-gray-50'}`}>
+        <div className="bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg shadow-md max-w-lg">
+          <div className="flex items-center mb-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-2 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <h3 className="font-bold text-lg">Erreur</h3>
+          </div>
+          <p>{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6">
+    <div className={`p-6 ${darkMode ? 'bg-dark-200' : 'bg-gray-50'} transition-colors duration-300 min-h-screen`}>
       <div className="mb-8 animate-fade-in">
         <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'} mb-2`}>Vue d'ensemble</h2>
         <p className={`${darkMode ? 'text-gray-300' : 'text-slate-600'}`}>
@@ -359,198 +314,292 @@ const DashboardContent = () => {
       </div>
       
       {/* Statistiques */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {stats.map((stat, index) => (
-          <motion.div
-            key={index}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className={`${darkMode ? 'bg-gray-900 text-white' : 'bg-white text-slate-800'} rounded-xl shadow-md overflow-hidden theme-transition`}
-          >
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className={`${darkMode ? 'text-gray-300' : 'text-slate-600'}`}>{stat.title}</div>
-                <div className={`p-2 rounded-lg ${
-                  darkMode 
-                    ? 'bg-blue-900/30 text-blue-300' 
-                    : 'bg-blue-50 text-blue-600'
-                }`}>
-                  {stat.icon}
-                </div>
-              </div>
-              <div className="flex items-end justify-between">
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <div className={`text-sm ${
-                  stat.trend === 'up' 
-                    ? darkMode ? 'text-green-400' : 'text-green-500' 
-                    : stat.trend === 'down' 
-                      ? darkMode ? 'text-red-400' : 'text-red-500'
-                      : darkMode ? 'text-gray-400' : 'text-slate-400'
-                }`}>
-                  <div className="flex items-center">
-                    {stat.trend === 'up' && (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                      </svg>
-                    )}
-                    {stat.trend === 'down' && (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                      </svg>
-                    )}
-                    {stat.change}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className={`h-1 w-full ${
-              stat.trend === 'up' 
-                ? 'bg-gradient-to-r from-green-400 to-green-500' 
-                : stat.trend === 'down' 
-                  ? 'bg-gradient-to-r from-red-400 to-red-500'
-                  : 'bg-gradient-to-r from-gray-400 to-gray-500'
-            }`}></div>
-          </motion.div>
-        ))}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        {/* Carte des bus */}
+        <StatCard 
+          title="Total Bus" 
+          value={stats.totalBuses} 
+          icon={
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+          }
+          linkText="Gérer les bus" 
+          linkUrl="/admin/buses" 
+          color="blue"
+        />
+        
+        {/* Carte des locations */}
+        <StatCard 
+          title="Total Locations" 
+          value={stats.totalLocations} 
+          icon={
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          }
+          linkText="Gérer les locations" 
+          linkUrl="/admin/locations" 
+          color="green"
+        />
+        
+        {/* Carte des horaires */}
+        <StatCard 
+          title="Total Horaires" 
+          value={stats.totalSchedules} 
+          icon={
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          }
+          linkText="Gérer les horaires" 
+          linkUrl="/admin/schedules" 
+          color="amber"
+        />
+        
+        {/* Carte des réservations */}
+        <StatCard 
+          title="Total Réservations" 
+          value={stats.totalReservations} 
+          icon={
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+            </svg>
+          }
+          linkText="Gérer les réservations" 
+          linkUrl="/admin/reservations" 
+          color="purple"
+        />
+        
+        {/* Carte des réservations actives */}
+        <StatCard 
+          title="Réservations Actives" 
+          value={stats.activeReservations} 
+          icon={
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          }
+          linkText="Voir les détails" 
+          linkUrl="/admin/reservations" 
+          color="indigo"
+        />
+        
+        {/* Carte des utilisateurs */}
+        <StatCard 
+          title="Total Utilisateurs" 
+          value={stats.totalUsers} 
+          icon={
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          }
+          linkText="Gérer les utilisateurs" 
+          linkUrl="/admin/users" 
+          color="rose"
+        />
       </div>
       
-      {/* Contenu principal */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Réservations récentes */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className={`lg:col-span-2 ${darkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-800'} rounded-xl shadow-md overflow-hidden theme-transition`}
-        >
-          <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Réservations récentes</h3>
-              <button className={`text-sm ${darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'} hover:underline transition-colors`}>
-                Voir tout
-              </button>
-            </div>
-          </div>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className={darkMode ? 'bg-gray-800' : 'bg-gray-50'}>
-                <tr className={`border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">ID</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Client</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Itinéraire</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Statut</th>
-                </tr>
-              </thead>
-              <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-100'}`}>
-                {recentBookings.map((booking, index) => (
-                  <tr 
-                    key={index} 
-                    className={`${darkMode ? 'hover:bg-gray-800' : 'hover:bg-gray-50'} transition-colors`}
-                  >
-                    <td className={`px-4 py-3 text-sm ${darkMode ? 'text-gray-300' : 'text-slate-800'}`}>{booking.id}</td>
-                    <td className={`px-4 py-3 text-sm ${darkMode ? 'text-gray-300' : 'text-slate-800'}`}>{booking.customer}</td>
-                    <td className={`px-4 py-3 text-sm ${darkMode ? 'text-gray-300' : 'text-slate-800'}`}>{booking.route}</td>
-                    <td className={`px-4 py-3 text-sm ${darkMode ? 'text-gray-300' : 'text-slate-800'}`}>{booking.date}</td>
-                    <td className="px-4 py-3 text-sm">
-                      <span className={`px-2 py-1 rounded-full text-xs inline-flex items-center ${
-                        booking.status === 'Confirmé' 
-                          ? darkMode ? 'bg-green-900/30 text-green-300' : 'bg-green-100 text-green-800' 
-                          : booking.status === 'En attente' 
-                            ? darkMode ? 'bg-yellow-900/30 text-yellow-300' : 'bg-yellow-100 text-yellow-800' 
-                            : darkMode ? 'bg-red-900/30 text-red-300' : 'bg-red-100 text-red-800'
-                      }`}>
-                        <span className={`w-2 h-2 rounded-full mr-1 ${
-                          booking.status === 'Confirmé' 
-                            ? 'bg-green-500' 
-                            : booking.status === 'En attente' 
-                              ? 'bg-yellow-500' 
-                              : 'bg-red-500'
-                        }`}></span>
-                        {booking.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </motion.div>
-        
-        {/* Actions rapides */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className={`${darkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-800'} rounded-xl shadow-md overflow-hidden theme-transition`}
-        >
-          <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold">Actions rapides</h3>
-          </div>
-          
-          <div className="p-6 space-y-4">
-            {quickActions.map((action, index) => (
-              <Link
-                key={index}
-                to={action.link}
-                className={`w-full flex items-center justify-between p-4 rounded-lg transition-all duration-300 transform hover:scale-105 ${
-                  darkMode 
-                    ? `bg-${action.color}-900/20 text-${action.color}-300 hover:bg-${action.color}-900/30` 
-                    : `bg-${action.color}-50 text-${action.color}-600 hover:bg-${action.color}-100`
-                }`}
-              >
-                <span className="flex items-center">
-                  {action.icon}
-                  {action.title}
-                </span>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </Link>
-            ))}
-          </div>
-        </motion.div>
+      {/* Quick Actions */}
+      <div className={`${darkMode ? 'bg-dark-100 border border-gray-800' : 'bg-white border border-gray-100'} shadow-lg rounded-lg p-6 transition-colors duration-300`}>
+        <h2 className={`text-lg font-medium ${darkMode ? 'text-gray-200' : 'text-gray-900'} mb-4 flex items-center`}>
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          Actions Rapides
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <QuickActionButton 
+            to="/admin/buses/new" 
+            text="Ajouter un Bus"
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+            }
+          />
+          <QuickActionButton 
+            to="/admin/locations/new" 
+            text="Ajouter une Location"
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+            }
+          />
+          <QuickActionButton 
+            to="/admin/schedules/new" 
+            text="Créer un Horaire"
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+            }
+          />
+        </div>
       </div>
     </div>
   );
 };
 
-export function Dashboard() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const navigate = useNavigate();
+// Composant pour les cartes de statistiques
+const StatCard = ({ title, value, icon, linkText, linkUrl, color }) => {
   const { darkMode } = useTheme();
   
+  const colorClasses = {
+    blue: {
+      bg: darkMode ? 'from-blue-900/20 to-blue-800/10' : 'from-blue-50 to-blue-100/60',
+      icon: darkMode ? 'text-blue-400' : 'text-blue-500',
+      border: darkMode ? 'border-blue-800/30' : 'border-blue-200',
+    },
+    green: {
+      bg: darkMode ? 'from-green-900/20 to-green-800/10' : 'from-green-50 to-green-100/60',
+      icon: darkMode ? 'text-green-400' : 'text-green-500',
+      border: darkMode ? 'border-green-800/30' : 'border-green-200',
+    },
+    amber: {
+      bg: darkMode ? 'from-amber-900/20 to-amber-800/10' : 'from-amber-50 to-amber-100/60',
+      icon: darkMode ? 'text-amber-400' : 'text-amber-500',
+      border: darkMode ? 'border-amber-800/30' : 'border-amber-200',
+    },
+    purple: {
+      bg: darkMode ? 'from-purple-900/20 to-purple-800/10' : 'from-purple-50 to-purple-100/60',
+      icon: darkMode ? 'text-purple-400' : 'text-purple-500',
+      border: darkMode ? 'border-purple-800/30' : 'border-purple-200',
+    },
+    indigo: {
+      bg: darkMode ? 'from-indigo-900/20 to-indigo-800/10' : 'from-indigo-50 to-indigo-100/60',
+      icon: darkMode ? 'text-indigo-400' : 'text-indigo-500',
+      border: darkMode ? 'border-indigo-800/30' : 'border-indigo-200',
+    },
+    rose: {
+      bg: darkMode ? 'from-rose-900/20 to-rose-800/10' : 'from-rose-50 to-rose-100/60',
+      icon: darkMode ? 'text-rose-400' : 'text-rose-500',
+      border: darkMode ? 'border-rose-800/30' : 'border-rose-200',
+    },
+  };
+  
+  const classes = colorClasses[color] || colorClasses.blue;
+  
+  return (
+    <motion.div
+      whileHover={{ scale: 1.02 }}
+      className={`overflow-hidden rounded-xl shadow-md border ${classes.border} bg-gradient-to-br ${classes.bg} transition-colors duration-300`}
+    >
+      <div className="px-4 py-5 sm:p-6 flex justify-between items-center">
+        <div>
+          <dt className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-500'} truncate`}>
+            {title}
+          </dt>
+          <dd className={`mt-1 text-3xl font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+            {value}
+          </dd>
+        </div>
+        <div className={`${classes.icon} opacity-80`}>
+          {icon}
+        </div>
+      </div>
+      <div className={`px-4 py-4 sm:px-6 border-t ${classes.border}`}>
+        <Link
+          to={linkUrl}
+          className={`text-sm font-medium ${darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-500'} flex items-center transition-colors`}
+        >
+          {linkText}
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+          </svg>
+        </Link>
+      </div>
+    </motion.div>
+  );
+};
+
+// Composant pour les boutons d'action rapide
+const QuickActionButton = ({ to, text, icon }) => {
+  const { darkMode } = useTheme();
+  
+  return (
+    <Link
+      to={to}
+      className={`flex items-center justify-center px-4 py-3 rounded-lg ${
+        darkMode 
+          ? 'bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-800/30' 
+          : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-100'
+      } transition-colors duration-200 font-medium`}
+    >
+      {icon}
+      {text}
+    </Link>
+  );
+};
+
+export function Dashboard() {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [stats, setStats] = useState({
+    totalBuses: 0,
+    totalLocations: 0,
+    totalSchedules: 0,
+    totalReservations: 0,
+    activeReservations: 0,
+    totalUsers: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { darkMode } = useTheme();
+
   useEffect(() => {
-    // Vérifier si l'administrateur est connecté
-    const userRole = localStorage.getItem('userRole');
-    const userId = localStorage.getItem('userId');
-    
-    if (!userId || userRole !== 'admin') {
-      navigate('/admin/login');
+    const fetchStats = async () => {
+      try {
+        setLoading(true);
+        const [buses, locations, schedules, reservations, profile] = await Promise.all([
+          getBuses(),
+          getLocations(),
+          getSchedules(),
+          getReservations(),
+          getUserProfile()
+        ]);
+
+        setStats({
+          totalBuses: Array.isArray(buses) ? buses.length : 0,
+          totalLocations: Array.isArray(locations) ? locations.length : 0,
+          totalSchedules: Array.isArray(schedules) ? schedules.length : 0,
+          totalReservations: Array.isArray(reservations) ? reservations.length : 0,
+          activeReservations: Array.isArray(reservations) ? 
+            reservations.filter(r => r.status === 'confirmed').length : 0,
+          totalUsers: Array.isArray(profile) ? profile.length : 1
+        });
+        
+        setError(null);
+      } catch (err) {
+        console.error('Erreur lors du chargement des statistiques:', err);
+        setError('Erreur lors du chargement des statistiques');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user?.isAdmin) {
+      fetchStats();
     } else {
-      setIsLoggedIn(true);
+      navigate('/');
     }
-  }, [navigate]);
-  
-  if (!isLoggedIn) {
-    return null; // ou un loader
-  }
-  
+  }, [user, navigate]);
+
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
   
   return (
-    <div className={`min-h-screen ${darkMode ? 'bg-gray-800' : 'bg-gray-100'} theme-transition`}>
+    <div className={`min-h-screen ${darkMode ? 'bg-dark-200' : 'bg-gray-100'} transition-colors duration-300`}>
       <Sidebar isOpen={isSidebarOpen} />
       
       <div className={`lg:ml-64 transition-all duration-300 min-h-screen flex flex-col`}>
         <DashboardHeader toggleSidebar={toggleSidebar} isSidebarOpen={isSidebarOpen} />
-        <main className="flex-grow">
-          <DashboardContent />
+        <main className="flex-grow flex flex-col">
+          <DashboardContent stats={stats} loading={loading} error={error} />
         </main>
       </div>
       
